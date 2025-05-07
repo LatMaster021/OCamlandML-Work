@@ -1,0 +1,109 @@
+(*---------------------------------------------------------------------------------------------------------------------*)
+
+(*#use "Session6&7@060525.ml";;*)
+
+(*Covers Lecture 9: Sequences, or Lazy Lists*)
+
+(*---------------------------------------------------------------------------------------------------------------------*)
+
+(*format to define a lazy list*)
+type 'a seq =
+    | Nil
+    | Cons of 'a * (unit -> 'a seq)
+
+(* strict_seq is the same thing as a list *)
+type 'a strict_seq =
+    | StrictNil (* empty list*)
+    | StrictCons of 'a * ('a seq) (* cons list star "*" means pair. Also not that there is no unit -> function here meaning that it evaluates without the need for on demand*)
+
+let my_example = StrictCons(3, Nil);;
+
+(* 
+star means pair in OCaML 
+let p : (int * string) = (1, "hello")
+
+example_list is the same thing as normal_list:
+let example_list : int strict_seq = StrictCons(1, StrictCons(2, StrictCons(3, StrictNil)))
+let normal_list : int list = [1 ; 2 ; 3]
+
+StrictCons(3, Nil) = [3]
+
+let tail (Cons (_, xf)) = xf ()
+let head (Cons (x, _)) = x
+*)
+
+(*Strict vs Lazy*)
+(* Strict means all the values are evaluated*)
+(* let strict_list : int list = [ 1 ; 2 ; 1 / 0] *)
+
+(* Lazy means values are only evaluated when they are demanded*)
+
+(*
+let lazy_seq : int seq = Cons(1, fun () -> Cons(2, fun () -> Cons (1 / 0, fun () -> Nil)))
+
+let f : int -> int = fun x -> 5 
+let g : int = f 7 (* g is 5*)
+
+
+let g y =  y + 1
+let h = g 4 (* y is the name for 4 in this instance*)
+
+*)
+let rec make_strict (x : 'a seq) : 'a list = 
+    match x with
+    | Nil -> []
+    | Cons (value, lazy_rest) -> value:: make_strict (lazy_rest ())
+
+let rec from k = 
+    Cons(k, fun () -> from (k+1))
+
+let rec take (x : 'a seq) (n : int) : 'a list = 
+    match n with
+    | 0 -> []
+    | n -> 
+        match x with
+        | Nil -> []
+        | Cons (a, b) -> a::take(b ()) (n - 1)
+
+(*appends the elements of 2 lazy lists*)
+let rec append (x : 'a seq) (y : 'a seq) : 'a seq = 
+    match x with 
+    | Nil -> y
+    | Cons (a, b) -> Cons(a, fun () -> append (b ()) (y))
+
+(*interleaves the elements of 2 lazy lists*)
+let rec interleave (x : 'a seq) (y : 'a seq) : 'a seq = 
+    match x with 
+    | Nil -> y
+    | Cons (a, b) -> Cons((a), fun () -> interleave(y) (b ()))
+
+let created_list = take (from 0) 10
+
+let lazy_seq : int seq = Cons(1, fun () -> Cons(2, fun () -> Cons (3, fun () -> Nil)))
+
+let x = append (lazy_seq) (lazy_seq)
+let evaluateda = make_strict(x)
+
+let y = interleave (lazy_seq) (lazy_seq)
+let evaluatedi = make_strict(y)
+
+let p x = x mod 2 = 0
+
+let rec filter (x : 'a seq) (p : 'a -> bool) : 'a seq = 
+    match x with
+    | Nil -> Nil
+    | Cons (a, b) -> if p (a) then
+                        Cons(a, fun () -> filter(b ()) (p))
+                    else
+                        filter(b ()) (p)
+
+let ex = take (filter (from 0) (fun y -> y mod 3 = 0)) 10
+
+(*sieve n returns a lazy sequence of integers >=n which are not multiples of n, nor multiples of any integer greater than n*)
+(*this actually effectively returns all primes and is known The Sieve of Eratosthenes*)
+let rec sieve (n : int) : 'a seq = 
+    let p x =  x mod n != 0 in
+    Cons(n, fun () -> filter (sieve(n + 1)) (p))
+
+let primes = sieve 2
+let example = take primes (10)
